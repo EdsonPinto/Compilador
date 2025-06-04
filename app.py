@@ -2,8 +2,8 @@
 import streamlit as st
 import gramatica
 from streamlit_ace import st_ace
-import pandas as pd # <--- NUEVA IMPORTACIÓN: Pandas para la tabla de símbolos
-import graphviz # <--- Asegúrate de que esta importación también esté presente
+import pandas as pd
+import graphviz
 
 # Configuración básica de la página de Streamlit
 st.set_page_config(
@@ -44,9 +44,9 @@ st.sidebar.info(
 st.markdown("---")
 
 # --- Inicialización de st.session_state para historial y editor ---
+# 'code_history' almacena las entradas de código previas
 if 'code_history' not in st.session_state:
     st.session_state.code_history = []
-    # Añadir un ejemplo de código inicial al historial si no hay ninguno
     default_code = """
 # Ejemplos de código:
 # Asignación y operaciones numéricas
@@ -101,45 +101,43 @@ final_suma = suma # Debería ser 10
 # Caracter ilegal (error léxico)
 # bad_char = $
 """
-    st.session_state.code_history.insert(0, default_code.strip()) # Añadir al inicio
+    st.session_state.code_history.insert(0, default_code.strip())
 
+# 'current_code' mantiene el código actual en el editor
 if 'current_code' not in st.session_state:
-    st.session_state.current_code = st.session_state.code_history[0] if st.session_state.code_history else ""
+    # Inicializa con el default_code si no hay nada en el historial o si no se ha establecido
+    st.session_state.current_code = default_code.strip()
 
-if 'compile_triggered' not in st.session_state:
-    st.session_state.compile_triggered = False
+# 'code_to_process_on_rerun' es el flag que dispara la compilación en la siguiente ejecución
+if 'code_to_process_on_rerun' not in st.session_state:
+    st.session_state.code_to_process_on_rerun = None # Inicialmente no hay código para procesar
 
+# 'error_annotations_for_rerun' almacena las anotaciones para el editor Ace
 if 'error_annotations_for_rerun' not in st.session_state:
     st.session_state.error_annotations_for_rerun = []
 
 
-# --- Área de entrada de código con resaltado de sintaxis y historial ---
+# --- Área de entrada de código con resaltado de sintaxis ---
 st.header("Código de Entrada")
 
-# Selector de historial
-if st.session_state.code_history:
-    # Definir el carácter de nueva línea fuera del f-string para evitar el SyntaxError
-    newline_char = '\n' # <--- ¡IMPORTANTE!
-
-    # Creamos una lista de opciones para el selectbox
-    history_options = [
-        # CORRECCIÓN DE LA LÍNEA 121: Usando newline_char
-        f"Entrada {i+1}: {entry[:50].replace(newline_char, ' ')}..." if len(entry) > 50 else f"Entrada {i+1}: {entry.splitlines()[0].strip()}"
-        for i, entry in enumerate(st.session_state.code_history)
-    ]
-
-    selected_history_index = st.selectbox(
-        "Seleccionar código del historial:",
-        options=range(len(history_options)),
-        format_func=lambda x: history_options[x],
-        key="history_selector"
-    )
-
-    # Si el usuario selecciona una entrada del historial, actualizamos el editor
-    if st.session_state.current_code != st.session_state.code_history[selected_history_index]:
-        st.session_state.current_code = st.session_state.code_history[selected_history_index]
-        # Forzar un rerun para que el editor se actualice con el código del historial
-        st.rerun() # Cambiado de experimental_rerun a rerun para versiones más recientes
+# Eliminamos la sección de "Seleccionar código del historial"
+# if st.session_state.code_history:
+#     newline_char = '\n'
+#     history_options = [
+#         f"Entrada {i+1}: {entry[:50].replace(newline_char, ' ')}..." if len(entry) > 50 else f"Entrada {i+1}: {entry.splitlines()[0].strip()}"
+#         for i, entry in enumerate(st.session_state.code_history)
+#     ]
+#     selected_history_index = st.selectbox(
+#         "Seleccionar código del historial:",
+#         options=range(len(history_options)),
+#         format_func=lambda x: history_options[x],
+#         key="history_selector"
+#     )
+#     if st.session_state.current_code != st.session_state.code_history[selected_history_index]:
+#         st.session_state.current_code = st.session_state.code_history[selected_history_index]
+#         st.session_state.error_annotations_for_rerun = []
+#         st.session_state.code_to_process_on_rerun = None
+#         st.rerun()
 
 # Usamos st_ace para el editor de código, pasando las anotaciones si hay
 user_code = st_ace(
@@ -152,41 +150,50 @@ user_code = st_ace(
     show_gutter=True,
     wrap=True,
     auto_update=False,
-    annotations=st.session_state.error_annotations_for_rerun # Pasa las anotaciones persistentes
+    annotations=st.session_state.error_annotations_for_rerun
 )
 
-# Actualiza el código en la sesión al valor que el usuario ingresó en el editor
+# Siempre actualiza el código en la sesión con el valor actual del editor.
 st.session_state.current_code = user_code
 
 
 # --- Botón para compilar ---
-if st.button("Compilar y Ejecutar Código", key="compile_button"):
-    st.session_state.compile_triggered = True
-    st.session_state.error_annotations_for_rerun = [] # Limpia anotaciones de la ejecución anterior
+compile_button_pressed = st.button("Compilar y Ejecutar Código", key="compile_button")
 
-    # Añadir el código actual al historial si es nuevo y no está vacío
-    if user_code.strip() and user_code.strip() not in st.session_state.code_history:
-        st.session_state.code_history.insert(0, user_code.strip()) # Añadir al inicio
-        # Opcional: Limitar el tamaño del historial
-        if len(st.session_state.code_history) > 10: # Mantener solo las últimas 10 entradas
-            st.session_state.code_history = st.session_state.code_history[:10]
-        # Forzar rerun para que el selectbox del historial se actualice
-        st.rerun() # Cambiado de experimental_rerun a rerun para versiones más recientes
-    # No es necesario un else para el st.experimental_rerun(), la lógica de procesamiento sigue su curso.
+if compile_button_pressed:
+    st.session_state.error_annotations_for_rerun = []
+    
+    if not st.session_state.current_code.strip():
+        st.warning("El código de entrada está vacío. Por favor, introduce código para compilar.")
+        st.session_state.code_to_process_on_rerun = None
+    else:
+        # Añadir el código actual al historial si es nuevo y no está vacío
+        if st.session_state.current_code.strip() not in st.session_state.code_history:
+            st.session_state.code_history.insert(0, st.session_state.current_code.strip())
+            if len(st.session_state.code_history) > 10:
+                st.session_state.code_history = st.session_state.code_history[:10]
+        
+        st.session_state.code_to_process_on_rerun = st.session_state.current_code
+    
+    st.rerun()
 
 
-# Procesar el código solo si el botón de compilación fue presionado
-if st.session_state.compile_triggered:
+# Procesar el código si hay un 'code_to_process_on_rerun' establecido
+if st.session_state.code_to_process_on_rerun is not None:
+    code_to_compile = st.session_state.code_to_process_on_rerun
+    st.session_state.code_to_process_on_rerun = None
+
     st.markdown("---")
     st.header("Resultados del Análisis y Ejecución")
 
-    ast, errors, evaluated_results = gramatica.parse_and_interpret_code(user_code)
+    ast, errors, evaluated_results = gramatica.parse_and_interpret_code(code_to_compile)
 
     if errors:
         st.error("¡Se detectaron errores en el código!")
+        new_annotations = []
         for err in errors:
             if err.get('line') is not None:
-                st.session_state.error_annotations_for_rerun.append({
+                new_annotations.append({
                     "row": err['line'] - 1,
                     "column": err.get('column', 0),
                     "text": f"{err['type']}: {err['message']}",
@@ -199,22 +206,26 @@ if st.session_state.compile_triggered:
                 f"**Columna**: {err.get('column', 'N/A')}\n\n"
             )
             st.markdown("---")
-
-        st.session_state.compile_triggered = False # Resetear para evitar bucles de re-ejecución
-        st.rerun() # Cambiado de experimental_rerun a rerun para versiones más recientes
+        
+        st.session_state.error_annotations_for_rerun = new_annotations
 
     else:
         st.success("¡Análisis y Ejecución Completados sin errores!")
-        st.session_state.error_annotations_for_rerun = [] # Limpia anotaciones si no hay errores
+        st.session_state.error_annotations_for_rerun = []
 
-        # --- Muestra el Árbol de Sintaxis Abstracta (AST) ---
         st.subheader("Árbol de Sintaxis Abstracta (AST)")
         st.write("El AST representa la estructura jerárquica de tu código. Es la salida del análisis sintáctico.")
-
+        
         if ast:
             try:
                 dot_graph = gramatica.generate_ast_graph(ast)
                 st.graphviz_chart(dot_graph)
+                st.download_button(
+                    label="Descargar AST (PNG)",
+                    data=dot_graph.pipe(format='png'),
+                    file_name="ast_compilador.png",
+                    mime="image/png"
+                )
             except Exception as e:
                 st.warning(f"No se pudo generar el gráfico del AST. Asegúrate de tener Graphviz instalado y configurado correctamente. Error: {e}")
                 st.code(ast, language='python')
@@ -224,22 +235,19 @@ if st.session_state.compile_triggered:
 
         st.subheader("Tabla de Símbolos Final")
         st.write("Contiene las variables declaradas, sus tipos inferidos y sus valores finales después de la ejecución.")
-
-        # --- MEJORA DE LA TABLA DE SÍMBOLOS ---
-        # Convertir el diccionario de la tabla de símbolos a un formato de lista de diccionarios
-        # para facilitar la creación de un DataFrame.
+        
         symbol_table_data = []
         for name, info in gramatica.get_symbol_table().items():
-            if info.get('type') != 'unknown_error': # Filtrar entradas de error
+            if info.get('type') != 'unknown_error':
                 symbol_table_data.append({
                     "Nombre Variable": name,
                     "Tipo": info.get('type', 'N/A'),
                     "Valor Final": info.get('evaluated_value', 'N/A')
                 })
-
+        
         if symbol_table_data:
             df_symbol_table = pd.DataFrame(symbol_table_data)
-            st.dataframe(df_symbol_table, use_container_width=True) # Muestra el DataFrame en Streamlit
+            st.dataframe(df_symbol_table, use_container_width=True)
         else:
             st.info("La tabla de símbolos está vacía o solo contiene entradas de error.")
 
@@ -247,11 +255,11 @@ if st.session_state.compile_triggered:
         st.subheader("Resultados Evaluados de Variables")
         st.write("Estos son los valores finales de las variables después de la ejecución del código.")
         if evaluated_results:
-            st.json(evaluated_results) # Se mantiene este JSON si prefieres ver todos los resultados, o podrías integrar en la tabla de símbolos.
+            st.json(evaluated_results)
         else:
             st.info("No hay resultados de variables para mostrar (quizás solo expresiones sin asignación o errores en la ejecución).")
-
-        st.session_state.compile_triggered = False # Resetear después de mostrar resultados
+        
+    st.session_state.code_to_process_on_rerun = None
 
 st.markdown("---")
 st.info("Desarrollado con Python y PLY para la asignatura de Compiladores.")
