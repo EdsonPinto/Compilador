@@ -5,7 +5,7 @@ from streamlit_ace import st_ace
 import pandas as pd
 import graphviz
 
-# Configuración básica de la página de Streamlit
+# Configuración básica de la página de Streamlit y prueba pa saber si hay cambios en el código
 st.set_page_config(
     page_title="Compilador Sencillo",
     layout="wide",
@@ -120,26 +120,6 @@ if 'error_annotations_for_rerun' not in st.session_state:
 # --- Área de entrada de código con resaltado de sintaxis ---
 st.header("Código de Entrada")
 
-# Eliminamos la sección de "Seleccionar código del historial"
-# if st.session_state.code_history:
-#     newline_char = '\n'
-#     history_options = [
-#         f"Entrada {i+1}: {entry[:50].replace(newline_char, ' ')}..." if len(entry) > 50 else f"Entrada {i+1}: {entry.splitlines()[0].strip()}"
-#         for i, entry in enumerate(st.session_state.code_history)
-#     ]
-#     selected_history_index = st.selectbox(
-#         "Seleccionar código del historial:",
-#         options=range(len(history_options)),
-#         format_func=lambda x: history_options[x],
-#         key="history_selector"
-#     )
-#     if st.session_state.current_code != st.session_state.code_history[selected_history_index]:
-#         st.session_state.current_code = st.session_state.code_history[selected_history_index]
-#         st.session_state.error_annotations_for_rerun = []
-#         st.session_state.code_to_process_on_rerun = None
-#         st.rerun()
-
-# Usamos st_ace para el editor de código, pasando las anotaciones si hay
 user_code = st_ace(
     value=st.session_state.current_code, # Usa el código guardado en session_state
     language="python",
